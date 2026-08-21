@@ -2,7 +2,7 @@
 
 use crate::network::NetworkError;
 use encoding_rs::{Encoding, UTF_8};
-use reqwest::{header::HeaderMap, Response};
+use reqwest::{Response, header::HeaderMap};
 use std::time::Instant;
 
 #[derive(Debug, Clone)]
@@ -74,7 +74,9 @@ impl ResponseProcessor {
         }
 
         // Get response bytes
-        let bytes = response.bytes().await
+        let bytes = response
+            .bytes()
+            .await
             .map_err(|e| NetworkError::Request(e))?;
 
         // Check actual size
@@ -112,7 +114,8 @@ impl ResponseProcessor {
             .unwrap_or_else(|| "text/html".to_string())
     }
 
-    fn extract_content_length(&self, headers: &HeaderMap) -> Option<usize> { // Fixed: Return type String -> Option<usize>
+    fn extract_content_length(&self, headers: &HeaderMap) -> Option<usize> {
+        // Fixed: Return type String -> Option<usize>
         headers
             .get("content-length")
             .and_then(|v| v.to_str().ok())
@@ -125,7 +128,11 @@ impl ResponseProcessor {
             .any(|allowed| content_type.starts_with(allowed))
     }
 
-    fn decode_content(&self, bytes: &[u8], content_type: &str) -> Result<(String, String), NetworkError> {
+    fn decode_content(
+        &self,
+        bytes: &[u8],
+        content_type: &str,
+    ) -> Result<(String, String), NetworkError> {
         // Try to detect encoding from content type
         let encoding = self.detect_encoding(bytes, content_type);
 
@@ -141,7 +148,8 @@ impl ResponseProcessor {
     fn detect_encoding(&self, bytes: &[u8], content_type: &str) -> &'static Encoding {
         // Try to extract charset from Content-Type header
         if let Some(charset) = self.extract_charset_content_type(content_type) {
-            if let Some(encoding) = Encoding::for_label(charset.as_bytes()) { // Fixed: from_label -> for_label
+            if let Some(encoding) = Encoding::for_label(charset.as_bytes()) {
+                // Fixed: from_label -> for_label
                 return encoding;
             }
         }
@@ -161,16 +169,14 @@ impl ResponseProcessor {
     }
 
     fn extract_charset_content_type(&self, content_type: &str) -> Option<String> {
-        content_type
-            .split(';')
-            .find_map(|part| {
-                let trimmed = part.trim();
-                if trimmed.starts_with("charset=") {
-                    Some(trimmed[8..].trim().to_string()) // Fixed: Added trim()
-                } else {
-                    None
-                }
-            })
+        content_type.split(';').find_map(|part| {
+            let trimmed = part.trim();
+            if trimmed.starts_with("charset=") {
+                Some(trimmed[8..].trim().to_string()) // Fixed: Added trim()
+            } else {
+                None
+            }
+        })
     }
 
     fn detect_html_encoding(&self, bytes: &[u8]) -> Option<&'static Encoding> {

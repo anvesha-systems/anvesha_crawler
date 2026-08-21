@@ -1,14 +1,14 @@
 // in memory caching implementaion
 
+use crate::storage::models::StoredPage;
+use crate::storage::{Result, StorageError};
 use moka::sync::Cache as MokaCache;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tracing::{info, debug};
-use crate::storage::{ Result, StorageError};
-use crate::storage::models::{ StoredPage};
+use tracing::{debug, info};
 
 // In memory cache implementaion using Moka
-pub struct MemoryCache{
+pub struct MemoryCache {
     // Page cache
     page_cache: MokaCache<String, StoredPage>,
 
@@ -19,7 +19,7 @@ pub struct MemoryCache{
     url_cache: MokaCache<String, bool>,
 
     // General purpose cache for serializable data
-    general_cache: MokaCache<String, String>,  // json string
+    general_cache: MokaCache<String, String>, // json string
 
     // Configuration
     default_ttl: Duration,
@@ -27,27 +27,30 @@ pub struct MemoryCache{
 
 impl MemoryCache {
     // Create a new memory cache
-    pub fn new(max_capaciity : u64, default_ttl : Duration) -> Self {
-        info!("Initializing memory cache with capacity : {}, TTL: {:?}", max_capaciity, default_ttl);
+    pub fn new(max_capaciity: u64, default_ttl: Duration) -> Self {
+        info!(
+            "Initializing memory cache with capacity : {}, TTL: {:?}",
+            max_capaciity, default_ttl
+        );
 
-        Self{
-            page_cache:MokaCache::builder()
-                .max_capacity(max_capaciity/4)
+        Self {
+            page_cache: MokaCache::builder()
+                .max_capacity(max_capaciity / 4)
                 .time_to_live(default_ttl)
                 .build(),
 
             search_cache: MokaCache::builder()
-                .max_capacity(max_capaciity/4)
+                .max_capacity(max_capaciity / 4)
                 .time_to_live(Duration::from_secs(300))
                 .build(),
 
             url_cache: MokaCache::builder()
-                .max_capacity(max_capaciity/2)
+                .max_capacity(max_capaciity / 2)
                 .time_to_live(default_ttl)
                 .build(),
 
             general_cache: MokaCache::builder()
-                .max_capacity(max_capaciity/4)
+                .max_capacity(max_capaciity / 4)
                 .time_to_live(default_ttl)
                 .build(),
 
@@ -56,14 +59,14 @@ impl MemoryCache {
     }
 
     // create a cache with default settings
-    pub fn default() -> Self{
+    pub fn default() -> Self {
         Self::new(10_000, Duration::from_secs(3600)) // 10k entries, 1 hr ttl
     }
 
     // page cache methods
 
     // cache a page
-    pub fn cache_page(&self, page: &StoredPage){
+    pub fn cache_page(&self, page: &StoredPage) {
         let key = format!("Page: {}", page.id);
         self.page_cache.insert(key.clone(), page.clone());
 
@@ -75,22 +78,22 @@ impl MemoryCache {
     }
 
     // Get a page by ID from cache
-    pub fn get_page_by_id(&self, page_id: i64)-> Option<StoredPage>{
+    pub fn get_page_by_id(&self, page_id: i64) -> Option<StoredPage> {
         let key = format!("Page: {}", page_id);
         let result = self.page_cache.get(&key);
 
-        if result.is_some(){
+        if result.is_some() {
             debug!("Cache hit for page ID: {}", page_id);
         }
         result
     }
 
     // get a page by URL from cache
-    pub fn get_page_by_url(&self, url: &str)-> Option<StoredPage>{
-        let key = format!("url : {}", url);
+    pub fn get_page_by_url(&self, url: &str) -> Option<StoredPage> {
+        let key = format!("URL: {}", url);
         let result = self.page_cache.get(&key);
 
-        if result.is_some(){
+        if result.is_some() {
             debug!("Cache hit for page URL: {}", url);
         }
 
@@ -100,31 +103,46 @@ impl MemoryCache {
     // URL Existance caching (for duplicate detection)
 
     // Cache url existance
-    pub fn cache_url_exists(&self, url:&str, exists: bool){
+    pub fn cache_url_exists(&self, url: &str, exists: bool) {
         self.url_cache.insert(url.to_string(), exists);
         debug!("Cached URL existance {}: {}", url, exists);
     }
 
     // check if URL existance is  cached
-    pub fn get_url_exists(&self, url:&str)-> Option<bool>{
+    pub fn get_url_exists(&self, url: &str) -> Option<bool> {
         self.url_cache.get(url)
     }
 
     // search result caching
 
     // caching search results
-    pub fn cache_search_results(&self, query: &str, limit:usize, offset: usize, results: &[StoredPage]){
+    pub fn cache_search_results(
+        &self,
+        query: &str,
+        limit: usize,
+        offset: usize,
+        results: &[StoredPage],
+    ) {
         let key = format!("Search : {} : {} : {}", query, limit, offset);
         self.search_cache.insert(key, results.to_vec());
-        debug!("Cache search results for query : {} ({} results)", query, results.len());
+        debug!(
+            "Cache search results for query : {} ({} results)",
+            query,
+            results.len()
+        );
     }
 
     // Get cached search results
-    pub fn get_search_results(&self, query:&str, limit: usize, offset: usize) -> Option<Vec<StoredPage>> {
+    pub fn get_search_results(
+        &self,
+        query: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Option<Vec<StoredPage>> {
         let key = format!("Search : {} : {} : {}", query, limit, offset);
         let result = self.search_cache.get(&key);
 
-        if result.is_some(){
+        if result.is_some() {
             debug!("Cache hit for search: {}", query);
         }
 
@@ -135,8 +153,8 @@ impl MemoryCache {
 
     // set a value in general cahce
     pub fn set<T: Serialize>(&self, key: &str, value: &T) -> Result<()> {
-        let json_value = serde_json::to_string(value)
-            .map_err(|e| StorageError::Serialization(e))?;
+        let json_value =
+            serde_json::to_string(value).map_err(|e| StorageError::Serialization(e))?;
 
         self.general_cache.insert(key.to_string(), json_value);
         debug!("Cached value for key: {}", key);
@@ -146,8 +164,8 @@ impl MemoryCache {
     /// Get a value from the general cache
     pub fn get<T: for<'de> Deserialize<'de>>(&self, key: &str) -> Result<Option<T>> {
         if let Some(json_value) = self.general_cache.get(key) {
-            let value = serde_json::from_str(&json_value)
-                .map_err(|e| StorageError::Serialization(e))?;
+            let value =
+                serde_json::from_str(&json_value).map_err(|e| StorageError::Serialization(e))?;
             debug!("Cache hit for key: {}", key);
             Ok(Some(value))
         } else {
@@ -176,15 +194,17 @@ impl MemoryCache {
 
     /// Get cache statistics
     pub fn get_stats(&self) -> CacheStats {
+        // Flush pending Moka housekeeping so entry_count() is accurate.
+        self.run_pending_tasks();
         CacheStats {
             page_cache_size: self.page_cache.entry_count(),
             search_cache_size: self.search_cache.entry_count(),
             url_cache_size: self.url_cache.entry_count(),
             general_cache_size: self.general_cache.entry_count(),
-            total_entries: self.page_cache.entry_count() +
-                self.search_cache.entry_count() +
-                self.url_cache.entry_count() +
-                self.general_cache.entry_count(),
+            total_entries: self.page_cache.entry_count()
+                + self.search_cache.entry_count()
+                + self.url_cache.entry_count()
+                + self.general_cache.entry_count(),
         }
     }
 
@@ -195,7 +215,6 @@ impl MemoryCache {
         self.url_cache.run_pending_tasks();
         self.general_cache.run_pending_tasks();
     }
-
 }
 
 /// Cache statistics

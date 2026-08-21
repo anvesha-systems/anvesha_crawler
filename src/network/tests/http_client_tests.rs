@@ -16,10 +16,7 @@ fn test_http_client_creation() {
 
 #[test]
 fn test_http_client_configuration() {
-    let user_agents = vec![
-        "TestAgent/1.0".to_string(),
-        "TestAgent/2.0".to_string(),
-    ];
+    let user_agents = vec!["TestAgent/1.0".to_string(), "TestAgent/2.0".to_string()];
 
     let client = HttpClient::new()
         .unwrap()

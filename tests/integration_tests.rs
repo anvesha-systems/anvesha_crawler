@@ -10,7 +10,7 @@ async fn test_http_client_basic_functionality() {
     match client.fetch("https://httpbin.org/html").await {
         Ok(response) => {
             assert_eq!(response.status_code, 200);
-            assert!(response.content.len() > 0);
+            assert!(!response.content.is_empty());
             assert!(response.content_type.starts_with("text/html"));
             assert!(response.fetch_time_ms > 0);
             println!("✅ HTTP client basic test passed");

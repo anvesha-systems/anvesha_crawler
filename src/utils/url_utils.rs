@@ -6,10 +6,7 @@ pub fn normalize_url(url: &str) -> Result<String, url::ParseError> {
 }
 
 pub fn extract_domain(url: &str) -> Option<String> {
-    Url::parse(url)
-        .ok()?
-        .host_str()
-        .map(|h| h.to_string())
+    Url::parse(url).ok()?.host_str().map(|h| h.to_string())
 }
 
 pub fn is_same_domain(url1: &str, url2: &str) -> bool {

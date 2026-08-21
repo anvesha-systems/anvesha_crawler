@@ -1,4 +1,4 @@
-use crate::models::{PageData, CrawlUrl};
+use crate::models::{CrawlUrl, PageData};
 use chrono::Utc;
 
 #[test]

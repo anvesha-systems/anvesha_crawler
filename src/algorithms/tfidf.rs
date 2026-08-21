@@ -1,7 +1,6 @@
-use std::collections::{ HashMap, HashSet };
+use std::collections::{HashMap, HashSet};
 use tantivy::schema::Value;
 use tracing::info;
-
 
 lazy_static::lazy_static! {
     static ref STOP_WORDS: HashSet<&'static str> = {
@@ -48,7 +47,10 @@ impl TfIdfCalculator {
     /// # Arguments
     /// * `documents` - Vec of (doc_id, content) tuples
     pub fn build_from_corpus(&mut self, documents: &[(String, String)]) {
-        info!("Building TF-IDF index from {} documents...", documents.len());
+        info!(
+            "Building TF-IDF index from {} documents...",
+            documents.len()
+        );
 
         self.total_docs = documents.len();
 
@@ -71,7 +73,10 @@ impl TfIdfCalculator {
             }
         }
 
-        info!("TF-IDF index built: {} unique terms", self.term_doc_freq.len());
+        info!(
+            "TF-IDF index built: {} unique terms",
+            self.term_doc_freq.len()
+        );
     }
 
     /// Calculate Term Frequency for a term in a document
@@ -110,7 +115,8 @@ impl TfIdfCalculator {
 
     /// Get top N terms for a document by TF-IDF score
     pub fn get_top_terms(&self, doc_id: &str, n: usize) -> Vec<(String, f64)> {
-        let mut scores: Vec<(String, f64)> = self.term_doc_freq
+        let mut scores: Vec<(String, f64)> = self
+            .term_doc_freq
             .keys()
             .map(|term| {
                 let score = self.calculate_tfidf(term, doc_id);
@@ -134,7 +140,8 @@ impl TfIdfCalculator {
 
         // Calculate dot product and magnitudes
         for term in &query_terms {
-            let query_tf = *query_term_counts.get(term).unwrap_or(&0) as f64 / query_terms.len() as f64;
+            let query_tf =
+                *query_term_counts.get(term).unwrap_or(&0) as f64 / query_terms.len() as f64;
             let doc_tfidf = self.calculate_tfidf(&term, doc_id);
             let query_idf = self.calculate_idf(&term);
             let query_tfidf = query_tf * query_idf;
@@ -205,8 +212,14 @@ mod tests {
 
         let docs = vec![
             ("doc1".to_string(), "web crawler crawls the web".to_string()),
-            ("doc2".to_string(), "web design for modern websites".to_string()),
-            ("doc3".to_string(), "search engine crawler technology".to_string()),
+            (
+                "doc2".to_string(),
+                "web design for modern websites".to_string(),
+            ),
+            (
+                "doc3".to_string(),
+                "search engine crawler technology".to_string(),
+            ),
         ];
 
         calculator.build_from_corpus(&docs);
@@ -230,9 +243,10 @@ mod tests {
     fn test_top_terms() {
         let mut calculator = TfIdfCalculator::new();
 
-        let docs = vec![
-            ("doc1".to_string(), "rust programming language is great for systems".to_string()),
-        ];
+        let docs = vec![(
+            "doc1".to_string(),
+            "rust programming language is great for systems".to_string(),
+        )];
 
         calculator.build_from_corpus(&docs);
 

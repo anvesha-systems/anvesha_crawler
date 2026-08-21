@@ -1,6 +1,6 @@
-use tantivy::schema::*;
-use tantivy::Index;
 use std::path::Path;
+use tantivy::Index;
+use tantivy::schema::*;
 
 #[derive(Debug)]
 pub struct SearchSchema {
@@ -39,8 +39,7 @@ impl SearchSchema {
 
         let schema = schema_builder.build();
 
-
-        Self{
+        Self {
             schema,
             url_field,
             title_field,
@@ -52,7 +51,7 @@ impl SearchSchema {
         }
     }
 
-    pub fn create_index(index_path : &Path) -> tantivy::Result<Index> {
+    pub fn create_index(index_path: &Path) -> tantivy::Result<Index> {
         let search_schema = Self::build();
 
         if !index_path.exists() {
@@ -61,11 +60,11 @@ impl SearchSchema {
 
         Index::create_in_dir(index_path, search_schema.schema)
     }
-    
+
     pub fn open_or_create(index_path: &Path) -> tantivy::Result<Index> {
         if index_path.exists() && index_path.read_dir()?.next().is_some() {
             Index::open_in_dir(index_path)
-        }else { 
+        } else {
             Self::create_index(index_path)
         }
     }

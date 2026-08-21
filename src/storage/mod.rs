@@ -1,23 +1,23 @@
 // storage module for persistant data management
 
-
+pub mod cache;
 pub mod database;
+pub mod export;
 pub mod models;
 pub mod repository;
 pub mod search_index;
-pub mod cache;
-pub mod export;
 mod tests;
 // Re-export main types
 
-pub use models::{StoredPage, SearchResult, DatabaseStats};
-
+pub use models::{DatabaseStats, SearchResult, StoredPage};
 
 // storage errors
 #[derive(Debug, thiserror::Error)]
 pub enum StorageError {
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
+    #[error("Migration error: {0}")]
+    Migration(#[from] sqlx::migrate::MigrateError),
     #[error("Search index error: {0}")]
     SearchIndex(String),
     #[error("Cache error: {0}")]

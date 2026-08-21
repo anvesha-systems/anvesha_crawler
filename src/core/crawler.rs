@@ -1,13 +1,13 @@
 use crate::config::CrawlerConfig;
-use crate::core::{UrlFrontier, PageProcessor};
-pub(crate) use crate::models::{CrawlUrl, PageData, CrawlStatistics};
+use crate::core::scheduler::CrawlScheduler;
+use crate::core::{PageProcessor, UrlFrontier};
+pub(crate) use crate::models::{CrawlStatistics, CrawlUrl, PageData};
 use crate::network::HttpClient;
+use crate::storage::repository::PageRepository;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 use tokio::task::JoinHandle;
-use tracing::{error, info, debug, warn};
-use crate::core::scheduler::CrawlScheduler;
-use crate::storage::repository::PageRepository;
+use tracing::{debug, error, info, warn};
 
 /// Main web crawler that orchestrates the crawling process
 #[derive(Clone)]
@@ -36,7 +36,9 @@ impl WebCrawler {
 
         // Create HTTP Client with config
         let http_client = HttpClient::new()?
-            .with_timeout(std::time::Duration::from_secs(config.network.request_timeout_secs))
+            .with_timeout(std::time::Duration::from_secs(
+                config.network.request_timeout_secs,
+            ))
             .with_user_agents(config.network.user_agents.clone())
             .with_max_content_size(config.network.max_content_size_mb * 1024 * 1024);
 
@@ -59,7 +61,7 @@ impl WebCrawler {
     // 🔥 FIX 1: Correct syntax for start_crawling_with_repository
     pub async fn start_crawling_with_repository(
         &self,
-        repository: Option<PageRepository>
+        repository: Option<PageRepository>,
     ) -> crate::Result<CrawlStatistics> {
         self.crawl_internal(repository).await
     }
@@ -70,8 +72,14 @@ impl WebCrawler {
     }
 
     // 🔥 FIX 2: Add the missing crawl_internal method
-    async fn crawl_internal(&self, repository: Option<PageRepository>) -> crate::Result<CrawlStatistics> {
-        info!("Starting web crawler with {} seed URLs", self.config.crawler.seed_urls.len());
+    async fn crawl_internal(
+        &self,
+        repository: Option<PageRepository>,
+    ) -> crate::Result<CrawlStatistics> {
+        info!(
+            "Starting web crawler with {} seed URLs",
+            self.config.crawler.seed_urls.len()
+        );
 
         // Add seed URLs to frontier
         self.initialize_frontier().await?;
@@ -87,9 +95,10 @@ impl WebCrawler {
             let crawler_clone = self.clone();
             let repo_clone = repo_arc.clone();
 
-            let handle = tokio::spawn(async move {
-                crawler_clone.crawler_worker(worker_id, repo_clone).await
-            });
+            let handle =
+                tokio::spawn(
+                    async move { crawler_clone.crawler_worker(worker_id, repo_clone).await },
+                );
             worker_handles.push(handle);
         }
 
@@ -111,7 +120,7 @@ impl WebCrawler {
     async fn crawler_worker(
         &self,
         worker_id: usize,
-        repository: Option<Arc<PageRepository>>
+        repository: Option<Arc<PageRepository>>,
     ) -> crate::Result<()> {
         info!("Starting crawler worker {}", worker_id);
 
@@ -137,7 +146,10 @@ impl WebCrawler {
             let domain = self.extract_domain(&crawl_url.url)?;
 
             // Crawl the page
-            match self.crawl_single_page(crawl_url, &domain, repository.as_ref()).await {
+            match self
+                .crawl_single_page(crawl_url, &domain, repository.as_ref())
+                .await
+            {
                 Ok(_) => {
                     self.pages_crawled.fetch_add(1, AtomicOrdering::Relaxed);
                 }
@@ -157,20 +169,26 @@ impl WebCrawler {
         &self,
         crawl_url: CrawlUrl,
         domain: &str,
-        repository: Option<&Arc<PageRepository>>
+        repository: Option<&Arc<PageRepository>>,
     ) -> crate::Result<()> {
         let url = crawl_url.url.clone();
 
         // Use scheduler to manage the request
-        let page_data = self.scheduler.schedule_crawl(domain, || async {
-            self.fetch_and_process_page(crawl_url.clone()).await
-        }).await?;
+        let page_data = self
+            .scheduler
+            .schedule_crawl(domain, || async {
+                self.fetch_and_process_page(crawl_url.clone()).await
+            })
+            .await?;
 
         // 🔥 NEW: Save to database if repository exists
         if let Some(repo) = repository {
             match repo.save_page(&page_data, 0).await {
                 Ok(page_id) => {
-                    info!("💾 Saved page to database: ID {}, URL: {}", page_id, page_data.url);
+                    info!(
+                        "💾 Saved page to database: ID {}, URL: {}",
+                        page_id, page_data.url
+                    );
 
                     // Save links if any
                     if !page_data.outgoing_links.is_empty() {
@@ -197,32 +215,35 @@ impl WebCrawler {
     }
 
     /// Fetch and process a single page (REAL HTTP CLIENT)
-    async fn fetch_and_process_page(&self, crawl_url: CrawlUrl) -> Result<PageData, Box<dyn std::error::Error + Send + Sync>> {
+    async fn fetch_and_process_page(
+        &self,
+        crawl_url: CrawlUrl,
+    ) -> Result<PageData, Box<dyn std::error::Error + Send + Sync>> {
         let url = crawl_url.url.clone();
         debug!("Fetching page: {} (depth: {})", url, crawl_url.depth);
 
         // Use HTTP client to fetch the page
-        let http_response = self.http_client.fetch(&url).await
-            .map_err(|e| {
-                warn!("Failed to fetch page {}: {}", url, e);
-                e
-            })?;
+        let http_response = self.http_client.fetch(&url).await.map_err(|e| {
+            warn!("Failed to fetch page {}: {}", url, e);
+            e
+        })?;
 
-        info!("Fetched page: {} - {} bytes in {}ms",
+        info!(
+            "Fetched page: {} - {} bytes in {}ms",
             url,
             http_response.content_length.unwrap_or(0),
             http_response.fetch_time_ms
         );
 
         // Use page processor to extract data from real HTML
-        let page_data = self.page_processor.process_page(
-            &url,
-            &http_response.content,
-            crawl_url.depth as u32
-        ).await.map_err(|e| {
-            warn!("Page processing failed for {}: {}", url, e);
-            Box::new(e) as Box<dyn std::error::Error + Send + Sync>
-        })?;
+        let page_data = self
+            .page_processor
+            .process_page(&url, &http_response.content, crawl_url.depth as u32)
+            .await
+            .map_err(|e| {
+                warn!("Page processing failed for {}: {}", url, e);
+                Box::new(e) as Box<dyn std::error::Error + Send + Sync>
+            })?;
 
         info!(
             "Processed {} - Found {} links, quality: {:.2}",
@@ -247,7 +268,10 @@ impl WebCrawler {
             self.url_frontier.add_url(crawl_url).await;
         }
 
-        info!("Initialized frontier with {} seed URLs", self.config.crawler.seed_urls.len());
+        info!(
+            "Initialized frontier with {} seed URLs",
+            self.config.crawler.seed_urls.len()
+        );
         Ok(())
     }
 
@@ -267,7 +291,8 @@ impl WebCrawler {
             urls_discovered: frontier_stats.seen_count,
             urls_in_queue: frontier_stats.queue_size,
             elapsed_time: self.start_time.elapsed(),
-            crawl_rate: self.pages_crawled.load(AtomicOrdering::Relaxed) as f64 / self.start_time.elapsed().as_secs_f64(),
+            crawl_rate: self.pages_crawled.load(AtomicOrdering::Relaxed) as f64
+                / self.start_time.elapsed().as_secs_f64(),
         }
     }
 }

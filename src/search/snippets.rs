@@ -7,8 +7,8 @@ pub struct SnippetGenerator {
 impl SnippetGenerator {
     pub fn new() -> Self {
         Self {
-            max_length: 200,      // Maximum snippet length in bytes
-            context_chars: 80,    // Characters before/after match
+            max_length: 200,   // Maximum snippet length in bytes
+            context_chars: 80, // Characters before/after match
         }
     }
 
@@ -18,12 +18,7 @@ impl SnippetGenerator {
     }
 
     /// Generate snippet from content with matched terms highlighted
-    pub fn generate(
-        &self,
-        content: &str,
-        query_terms: &[String],
-        highlight: bool,
-    ) -> String {
+    pub fn generate(&self, content: &str, query_terms: &[String], highlight: bool) -> String {
         if content.is_empty() {
             return String::from("No content available");
         }
@@ -159,7 +154,8 @@ mod tests {
     #[test]
     fn test_snippet_generation() {
         let generator = SnippetGenerator::new();
-        let content = "A web crawler is an Internet bot that systematically browses the World Wide Web.";
+        let content =
+            "A web crawler is an Internet bot that systematically browses the World Wide Web.";
         let terms = vec!["crawler".to_string()];
 
         let snippet = generator.generate(content, &terms, false);

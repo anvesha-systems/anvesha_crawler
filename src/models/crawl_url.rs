@@ -16,7 +16,8 @@ impl Ord for CrawlUrl {
         match self.priority.partial_cmp(&other.priority) {
             Some(Ordering::Equal) => {
                 // If priorities are equal, prefer lower depth (shallow pages first)
-                match other.depth.cmp(&self.depth) { // Reverse depth comparison
+                match other.depth.cmp(&self.depth) {
+                    // Reverse depth comparison
                     Ordering::Equal => {
                         // If depth is equal, prefer earlier discovered (FIFO)
                         other.discovered_at.cmp(&self.discovered_at) // Reverse time comparison

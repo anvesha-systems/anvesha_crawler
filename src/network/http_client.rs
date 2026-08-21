@@ -1,6 +1,6 @@
 //! HTTP client with user agent rotation and robust error handling
 
-use crate::network::{NetworkError, HttpResponse, classify_reqwest_error, ResponseProcessor};
+use crate::network::{HttpResponse, NetworkError, ResponseProcessor, classify_reqwest_error};
 use reqwest::{Client, ClientBuilder, redirect::Policy};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering}; // Fixed: removed duplicate and typo
@@ -65,11 +65,19 @@ impl HttpClient {
     }
 
     /// Fetch URL with custom timeout
-    pub async fn fetch_with_timeout(&self, url: &str, timeout: Duration) -> Result<HttpResponse, NetworkError> {
+    pub async fn fetch_with_timeout(
+        &self,
+        url: &str,
+        timeout: Duration,
+    ) -> Result<HttpResponse, NetworkError> {
         self.fetch_with_options(url, Some(timeout)).await
     }
 
-    async fn fetch_with_options(&self, url: &str, timeout: Option<Duration>) -> Result<HttpResponse, NetworkError> {
+    async fn fetch_with_options(
+        &self,
+        url: &str,
+        timeout: Option<Duration>,
+    ) -> Result<HttpResponse, NetworkError> {
         let start_time = Instant::now();
         let user_agent = self.get_next_user_agent();
         let timeout = timeout.unwrap_or(self.default_timeout);
@@ -77,22 +85,28 @@ impl HttpClient {
         debug!("Fetching URL: {} (timeout: {}s)", url, timeout.as_secs()); // Fixed: missing closing parenthesis
 
         // Validate URL format
-        let parsed_url = url::Url::parse(url)
-            .map_err(|_| NetworkError::InvalidUrl(url.to_string()))?; // Fixed: removed unused parameter
+        let parsed_url =
+            url::Url::parse(url).map_err(|_| NetworkError::InvalidUrl(url.to_string()))?; // Fixed: removed unused parameter
 
         // Only allow HTTP/HTTPS
         match parsed_url.scheme() {
-            "http" | "https" => {},
-            scheme => return Err(NetworkError::InvalidUrl(
-                format!("Unsupported scheme: {}", scheme) // Fixed: clearer error message
-            )),
+            "http" | "https" => {}
+            scheme => {
+                return Err(NetworkError::InvalidUrl(
+                    format!("Unsupported scheme: {}", scheme), // Fixed: clearer error message
+                ));
+            }
         }
 
         // Build request
-        let mut request_builder = self.client
+        let mut request_builder = self
+            .client
             .get(url)
             .header("User-Agent", &user_agent)
-            .header("Accept", "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8") // Fixed: spacing
+            .header(
+                "Accept",
+                "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
+            ) // Fixed: spacing
             .header("Accept-Language", "en-US,en;q=0.5") // Fixed: spacing and capitalization
             .header("Accept-Encoding", "gzip, deflate, br") // Fixed: spacing
             .header("DNT", "1")
@@ -119,7 +133,8 @@ impl HttpClient {
         }
 
         // Process response
-        let http_response = self.response_processor
+        let http_response = self
+            .response_processor
             .process_response(response, start_time, redirect_count)
             .await?;
 
@@ -148,7 +163,8 @@ impl HttpClient {
     pub async fn test_url(&self, url: &str) -> Result<u16, NetworkError> {
         let user_agent = self.get_next_user_agent();
 
-        let response = self.client
+        let response = self
+            .client
             .head(url)
             .header("User-Agent", &user_agent)
             .timeout(Duration::from_secs(10))

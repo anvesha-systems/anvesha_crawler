@@ -1,5 +1,5 @@
 use crate::models::crawl_url::CrawlUrl;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PageData {
@@ -11,6 +11,6 @@ pub struct PageData {
     pub outgoing_links: Vec<CrawlUrl>,
     pub word_count: usize,
     pub content_quality_score: f64,
-    pub crawled_at : chrono::DateTime<chrono::Utc>,
-    pub depth : u32,
+    pub crawled_at: chrono::DateTime<chrono::Utc>,
+    pub depth: u32,
 }

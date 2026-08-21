@@ -79,7 +79,6 @@ impl Default for DatabaseConfig {
 
  */
 
-
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "database")]
 use sqlx::postgres::PgConnectOptions;

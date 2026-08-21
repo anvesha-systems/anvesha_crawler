@@ -1,13 +1,12 @@
-use std::path::Path;
 use clap::Parser;
-use crawler::{init, CrawlerConfig, WebCrawler};
-use tracing::{info, warn};
-use crawler::search::query::SearchQuery;
+use crawler::algorithms::{LinkGraph, PageRankCalculator};
 use crawler::storage::database::{Database, DatabaseConfig};
-use crawler::storage::repository::PageRepository;
-use crawler::algorithms::{LinkGraph, PageRankCalculator, TfIdfCalculator};
 use crawler::storage::models::PageFilter;
-use crate::Commands::CalculatePageRank;
+use crawler::storage::repository::PageRepository;
+use crawler::{CrawlerConfig, WebCrawler, init};
+use std::path::Path;
+use std::sync::Arc;
+use tracing::{info, warn};
 
 #[derive(Parser)]
 #[command(name = "search-crawler")]
@@ -81,16 +80,18 @@ enum Commands {
         top: usize,
     },
 
-    CalculateTfIdf{
-
+    CalculateTfIdf {
         // show up n terms for each document
         #[arg(long, default_value = "10")]
-        top : Option<usize>,
+        top: Option<usize>,
     },
 
     Api {
         #[arg(short, long, default_value = "3000")]
         port: u16,
+
+        #[arg(long, default_value = "./search_index")]
+        index_path: String,
     },
     Stats,
 }
@@ -107,7 +108,11 @@ async fn main() -> crawler::Result<()> {
     info!("Loaded configuration from: {}", args.config);
 
     match args.command {
-        Some(Commands::Crawl { seed_urls, save_to_db, max_pages }) => {
+        Some(Commands::Crawl {
+            seed_urls,
+            save_to_db,
+            max_pages,
+        }) => {
             let mut crawler_config = config;
 
             // Update seed URLs if provided
@@ -149,7 +154,7 @@ async fn main() -> crawler::Result<()> {
 
         Some(Commands::Index { index_path }) => {
             use crawler::search::SearchIndexer;
-            use crawler::storage::database::{ Database, DatabaseConfig };
+            use crawler::storage::database::{Database, DatabaseConfig};
             use crawler::storage::repository::PageRepository;
 
             info!("Starting search indexing...");
@@ -161,10 +166,9 @@ async fn main() -> crawler::Result<()> {
 
             // create indexer and index all pages
             let indexer = SearchIndexer::new(Path::new(&index_path))?;
-            let count= indexer.index_all_pages(&repository).await?;
+            indexer.index_all_pages(&repository).await?;
 
-            // TODO : Fix this bug count is acting as a fn convert it into integer
-            println!("Indexing completed! {:?} pages indexed", count);
+            println!("Indexing completed!");
         }
 
         Some(Commands::CalculatePageRank { top }) => {
@@ -177,9 +181,11 @@ async fn main() -> crawler::Result<()> {
 
             // Load graph from repository
             let graph = LinkGraph::from_repository(&repository).await?;
-            info!("Graph Stats: {} nodes, {} dangling nodes",
-        graph.node_count(),
-        graph.dangling_nodes().len());
+            info!(
+                "Graph Stats: {} nodes, {} dangling nodes",
+                graph.node_count(),
+                graph.dangling_nodes().len()
+            );
 
             // Calculate PageRank
             let calculator = PageRankCalculator::new();
@@ -187,7 +193,8 @@ async fn main() -> crawler::Result<()> {
 
             // Store PageRank values using batch update for efficiency
             info!("Storing PageRank values...");
-            let ranks_vec: Vec<(String, f64)> = ranks.iter()
+            let ranks_vec: Vec<(String, f64)> = ranks
+                .iter()
                 .map(|(url, rank)| (url.clone(), *rank))
                 .collect();
 
@@ -196,15 +203,11 @@ async fn main() -> crawler::Result<()> {
             // Display top pages
             let top_pages = calculator.get_top_pages(&ranks, top);
             println!("\nTop {} Pages by PageRank:\n", top);
-            println!("{:<6} {:<12} {}", "Rank", "PageRank", "URL");
+            println!("{:<6} {:<12} URL", "Rank", "PageRank");
             println!("{}", "=".repeat(80));
 
             for (i, (url, rank)) in top_pages.iter().enumerate() {
-                println!("{:<6} {:<12.6} {}",
-                         format!("{}.", i + 1),
-                         rank,
-                         url
-                );
+                println!("{:<6} {:<12.6} {}", format!("{}.", i + 1), rank, url);
             }
 
             println!("\nPageRank calculation complete!");
@@ -222,7 +225,8 @@ async fn main() -> crawler::Result<()> {
             println!("📊 Loaded {} documents", pages.len());
 
             // Build corpus: (doc_id=url_hash preferred for stability, content)
-            let corpus: Vec<(String, String)> = pages.iter()
+            let corpus: Vec<(String, String)> = pages
+                .iter()
                 .map(|p| (p.url_hash.clone(), p.content.clone()))
                 .collect();
 
@@ -243,15 +247,24 @@ async fn main() -> crawler::Result<()> {
             println!("TF-IDF scores updated");
         }
 
-
-
-        Some(Commands::Search { query, index_path, limit, domain, offset, min_quality, max_quality, sort, snippets, highlight }) => {
-            use crawler::search::{SearchQuery};
+        Some(Commands::Search {
+            query,
+            index_path,
+            limit,
+            domain,
+            offset,
+            min_quality,
+            max_quality,
+            sort,
+            snippets,
+            highlight,
+        }) => {
+            use crawler::search::SearchQuery;
             use crawler::search::filters::{SearchFilter, SortBy};
             use std::path::Path;
             use std::str::FromStr;
 
-            info!("Searching for : '{}'",query);
+            info!("Searching for : '{}'", query);
 
             // Build filters
             let mut filters = SearchFilter::new();
@@ -270,34 +283,43 @@ async fn main() -> crawler::Result<()> {
             }
 
             // Parse sort option
-            let sort_by = SortBy::from_str(&sort)
-                .unwrap_or_else(|e| {
-                    warn!("Invalid sort option '{}', using relevance", sort);
-                    SortBy::Relevance
-                });
-
+            let sort_by = SortBy::from_str(&sort).unwrap_or_else(|_e| {
+                warn!("Invalid sort option '{}', using relevance", sort);
+                SortBy::Relevance
+            });
 
             // create search query engine
             let search_engine = SearchQuery::new(Path::new(&index_path))?;
 
             // execute search
-            let results = search_engine.search_with_filters(&query, limit, filters, sort_by, offset, snippets, highlight)?;
+            let results = search_engine.search_with_filters(
+                &query, limit, filters, sort_by, offset, snippets, highlight,
+            )?;
 
             // display results
             println!("\n Search results for : '{}'\n", query);
             println!("Found {} results : \n", results.len());
 
             for (i, result) in results.iter().enumerate() {
-                println!(" {}. {} (score : {:.3}, pagerank:  {:.6}, tfidf: {:.6})", i+1, result.url, result.score, result.pagerank, result.tfidf);
+                println!(
+                    " {}. {} (score : {:.3}, pagerank:  {:.6}, tfidf: {:.6})",
+                    i + 1,
+                    result.url,
+                    result.score,
+                    result.pagerank,
+                    result.tfidf
+                );
                 if let Some(ref title) = result.title {
                     println!("Title: {}", title);
                 }
-                println!(" Domain: {} | Quality: {:.3}", result.domain, result.quality_score);
+                println!(
+                    " Domain: {} | Quality: {:.3}",
+                    result.domain, result.quality_score
+                );
 
-                
                 // printing the snippet
-                if snippets{
-                    match & result.snippet {
+                if snippets {
+                    match &result.snippet {
                         Some(snippet) => {
                             println!("Snippet: {}", snippet);
                         }
@@ -310,8 +332,30 @@ async fn main() -> crawler::Result<()> {
             }
         }
 
-        Some(Commands::Api { port }) => {
-            println!("API server not implemented yet. Port: {}", port);
+        Some(Commands::Api { port, index_path }) => {
+            use crawler::SearchEngine;
+            use crawler::api::{AppState, build_router};
+
+            let index = Path::new(&index_path);
+            if !index.exists() {
+                eprintln!(
+                    "Error: index path '{}' does not exist. Run `crawler index` first.",
+                    index_path
+                );
+                std::process::exit(1);
+            }
+
+            let engine = SearchEngine::new(index)?;
+            let api_key = std::env::var("ANVESHA_SEARCH_API_KEY").ok();
+            let auth_enabled = api_key.is_some();
+            let state = Arc::new(AppState { engine, api_key });
+
+            let router = build_router(state);
+            let addr = format!("127.0.0.1:{}", port);
+            let listener = tokio::net::TcpListener::bind(&addr).await?;
+
+            info!(port = port, index_path = %index_path, auth_enabled = auth_enabled, "API server starting");
+            axum::serve(listener, router).await?;
         }
         Some(Commands::Stats) => {
             println!("Crawler Statistics:");
@@ -320,7 +364,6 @@ async fn main() -> crawler::Result<()> {
             let crawler = WebCrawler::new(config).await?;
             crawler.start_crawling().await?;
         }
-        _ => {}
     }
 
     Ok(())

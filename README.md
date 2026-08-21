@@ -157,4 +157,113 @@ src/
 
 ---
 
+## V1 Search API
+
+The binary exposes a lightweight HTTP Search API on top of the existing Tantivy index.
+The API process requires **only the pre-built index directory** — no PostgreSQL connection needed at runtime.
+
+### Building the search index
+
+Run these steps once (requires PostgreSQL):
+
+```bash
+# 1. Crawl and save pages
+cargo run -- crawl --seed-urls https://example.com --save-to-db
+
+# 2. Compute PageRank scores
+cargo run -- calculate-page-rank
+
+# 3. Compute TF-IDF scores
+cargo run -- calculate-tf-idf
+
+# 4. Build the Tantivy index
+cargo run -- index --index-path ./search_index
+```
+
+### Starting the API server
+
+```bash
+# No authentication (local development)
+cargo run -- api --port 3000 --index-path ./search_index
+
+# With authentication
+ANVESHA_SEARCH_API_KEY=your-secret-key \
+  cargo run -- api --port 3000 --index-path ./search_index
+```
+
+The server binds to `127.0.0.1` by default.
+
+### API endpoints
+
+#### `GET /healthz`
+
+Always returns 200. No authentication required.
+
+```bash
+curl http://127.0.0.1:3000/healthz
+# {"status":"ok"}
+```
+
+#### `GET /v1/search`
+
+Query parameters:
+
+| Parameter | Required | Default | Notes |
+|-----------|----------|---------|-------|
+| `q`       | yes      | —       | search query |
+| `limit`   | no       | 10      | max results, 1–100 |
+| `offset`  | no       | 0       | pagination offset |
+
+Response:
+
+```json
+{
+  "results": [
+    {
+      "url": "https://rust-lang.org",
+      "title": "The Rust Programming Language",
+      "snippet": "A language empowering everyone...",
+      "score": 0.97
+    }
+  ],
+  "took_ms": 12
+}
+```
+
+Error response:
+
+```json
+{ "error": "stable_error_category" }
+```
+
+### Authentication
+
+Set `ANVESHA_SEARCH_API_KEY` to enable Bearer token authentication:
+
+```bash
+curl \
+  -H "Authorization: Bearer $ANVESHA_SEARCH_API_KEY" \
+  "http://127.0.0.1:3000/v1/search?q=rust&limit=10"
+```
+
+If the environment variable is not set, all requests are allowed (local dev mode).
+The key is never written to logs.
+
+### Environment variables
+
+| Variable                 | Default                   | Description                          |
+|--------------------------|---------------------------|--------------------------------------|
+| `ANVESHA_SEARCH_API_KEY` | *(unset — no auth)*       | Bearer token for `/v1/search`        |
+
+### Privacy
+
+The API never logs:
+- raw search queries
+- page content or snippets
+- API keys or Authorization headers
+
+Safe metadata logged per request: result count, latency, HTTP status.
+
+---
+
 > The architecture is production-ready and modular. HTTP client integration will make the crawler fully functional for real-world use.

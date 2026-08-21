@@ -22,11 +22,7 @@ async fn test_page_processor_html_parsing() {
         </html>
     "#;
 
-    let result = processor.process_page(
-        "https://test.com",
-        html,
-        0
-    ).await;
+    let result = processor.process_page("https://test.com", html, 0).await;
 
     assert!(result.is_ok());
     let page_data = result.unwrap();
@@ -35,7 +31,10 @@ async fn test_page_processor_html_parsing() {
     assert_eq!(page_data.title, Some("Test Page".to_string()));
 
     // Test description extraction
-    assert_eq!(page_data.description, Some("A test page for crawling".to_string()));
+    assert_eq!(
+        page_data.description,
+        Some("A test page for crawling".to_string())
+    );
 
     // Test keywords extraction
     assert!(page_data.keywords.contains(&"test".to_string()));
@@ -62,11 +61,9 @@ async fn test_page_processor_empty_content() {
 
     let empty_html = "<html><head></head><body></body></html>";
 
-    let result = processor.process_page(
-        "https://test.com",
-        empty_html,
-        0
-    ).await;
+    let result = processor
+        .process_page("https://test.com", empty_html, 0)
+        .await;
 
     assert!(result.is_ok());
     let page_data = result.unwrap();

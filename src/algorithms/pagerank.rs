@@ -1,16 +1,16 @@
-use std::collections::HashMap;
 use super::graph::LinkGraph;
-use tracing::{info, debug};
+use std::collections::HashMap;
+use tracing::{debug, info};
 
-pub struct PageRankCalculator{
+pub struct PageRankCalculator {
     damping_factor: f64,
     iterations: usize,
     convergence_threshold: f64,
 }
 
-impl PageRankCalculator{
-    pub fn new() -> Self{
-        Self{
+impl PageRankCalculator {
+    pub fn new() -> Self {
+        Self {
             damping_factor: 0.85,
             iterations: 30,
             convergence_threshold: 0.0001,
@@ -28,14 +28,15 @@ impl PageRankCalculator{
         // initialize all pages with equal rank
         let initial_rank = 1.0 / n;
 
-        let mut ranks: HashMap<String, f64> = graph.nodes
+        let mut ranks: HashMap<String, f64> = graph
+            .nodes
             .iter()
             .map(|url| (url.clone(), initial_rank))
             .collect();
 
         // iterative calculation
         for iteration in 0..self.iterations {
-            let mut new_ranks= HashMap::new();
+            let mut new_ranks = HashMap::new();
             let mut total_diff = 0.0;
 
             for url in &graph.nodes {
@@ -64,11 +65,11 @@ impl PageRankCalculator{
             }
             ranks = new_ranks;
 
-            debug!("iterations : {} : diff = {:.6}", iteration+1, total_diff);
+            debug!("iterations : {} : diff = {:.6}", iteration + 1, total_diff);
 
             // check convergence
             if total_diff < self.convergence_threshold {
-                info!("Pagerank converged at iteration {}", iteration+1);
+                info!("Pagerank converged at iteration {}", iteration + 1);
                 break;
             }
         }
@@ -85,11 +86,12 @@ impl PageRankCalculator{
     }
 
     pub fn get_top_pages(&self, ranks: &HashMap<String, f64>, limit: usize) -> Vec<(String, f64)> {
-        let mut ranked: Vec<_> = ranks.iter()
+        let mut ranked: Vec<_> = ranks
+            .iter()
             .map(|(url, rank)| (url.clone(), *rank))
             .collect();
 
-        ranked.sort_by(|a,b| b.1.partial_cmp(&a.1).unwrap());
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         ranked.into_iter().take(limit).collect()
     }
 }

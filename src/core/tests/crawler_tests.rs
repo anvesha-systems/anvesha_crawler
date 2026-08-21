@@ -1,6 +1,6 @@
 // Fix the import - WebCrawler is in the parent module (crate::core)
-use crate::core::crawler::WebCrawler; // ✅ Correct path
 use crate::config::CrawlerConfig;
+use crate::core::crawler::WebCrawler; // ✅ Correct path
 use crate::models::CrawlUrl;
 
 #[tokio::test]
@@ -20,7 +20,7 @@ async fn test_crawler_statistics_generation() {
     // Test initial state
     assert_eq!(stats.pages_crawled, 0);
     assert_eq!(stats.pages_failed, 0);
-    assert!(stats.elapsed_time.as_millis() >= 0);
+    let _ = stats.elapsed_time.as_millis(); // always non-negative for Duration
     assert_eq!(stats.crawl_rate, 0.0);
 }
 
@@ -59,7 +59,10 @@ async fn test_crawler_end_to_end() {
             println!("✅ End-to-end test: {:?}", stats);
         }
         Err(e) => {
-            println!("⚠️ End-to-end test failed (expected in some environments): {}", e);
+            println!(
+                "⚠️ End-to-end test failed (expected in some environments): {}",
+                e
+            );
         }
     }
 }

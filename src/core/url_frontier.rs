@@ -5,7 +5,7 @@ use dashmap::DashSet;
 use std::collections::BinaryHeap;
 use std::sync::Arc;
 use tokio::sync::Mutex; // Changed: std::sync::Mutex -> tokio::sync::Mutex (for async)
-use tracing::{debug};
+use tracing::debug;
 
 /// Thread-safe URL frontier that manages crawling queue with prioritization
 pub struct UrlFrontier {
@@ -97,7 +97,7 @@ impl UrlFrontier {
 
 #[derive(Debug, Clone)]
 pub struct FrontierStats {
-    pub queue_size: usize,     // Changed: pub(crate) -> pub
-    pub seen_count: usize,     // Changed: pub(crate) -> pub
-    pub crawled_count: usize,  // Added: pub visibility
+    pub queue_size: usize,    // Changed: pub(crate) -> pub
+    pub seen_count: usize,    // Changed: pub(crate) -> pub
+    pub crawled_count: usize, // Added: pub visibility
 }

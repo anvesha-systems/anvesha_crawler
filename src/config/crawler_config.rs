@@ -30,9 +30,14 @@ pub struct NetworkSettings {
     pub connect_timeout_secs: u64,
 }
 
+fn default_max_connections() -> u32 {
+    10
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageSettings {
     pub database_url: String,
+    #[serde(default = "default_max_connections")]
     pub max_connections: u32,
     pub redis_url: Option<String>,
     pub enable_caching: bool,
@@ -45,7 +50,6 @@ pub struct AlgorithmSettings {
     pub enable_opic: bool,
     pub priority_boost_domains: Vec<String>,
 }
-
 
 impl CrawlerConfig {
     pub fn from_file(path: &str) -> crate::Result<Self> {

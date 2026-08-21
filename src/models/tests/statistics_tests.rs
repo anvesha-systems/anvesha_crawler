@@ -9,7 +9,7 @@ fn test_crawl_statistics_creation() {
         urls_discovered: 500,
         urls_in_queue: 25,
         elapsed_time: Duration::from_secs(300), // 5 minutes
-        crawl_rate: 0.33, // pages per second
+        crawl_rate: 0.33,                       // pages per second
     };
 
     assert_eq!(stats.pages_crawled, 100);
@@ -84,7 +84,7 @@ fn test_crawl_statistics_edge_cases() {
         urls_discovered: 10,
         urls_in_queue: 9,
         elapsed_time: Duration::from_secs(3600), // 1 hour
-        crawl_rate: 1.0 / 3600.0, // Very slow rate
+        crawl_rate: 1.0 / 3600.0,                // Very slow rate
     };
 
     assert!(stats_long_time.crawl_rate < 0.001);
@@ -100,7 +100,7 @@ fn test_crawl_statistics_realistic_scenario() {
         urls_discovered: 8000,
         urls_in_queue: 2500,
         elapsed_time: Duration::from_secs(3600), // 1 hour
-        crawl_rate: 1500.0 / 3600.0, // ~0.42 pages/second
+        crawl_rate: 1500.0 / 3600.0,             // ~0.42 pages/second
     };
 
     // Validate realistic ranges

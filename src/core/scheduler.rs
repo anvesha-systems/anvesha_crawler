@@ -1,7 +1,7 @@
 use crate::config::CrawlerConfig;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
-use tokio::time::{sleep, Duration, Instant};
+use tokio::time::{Duration, Instant, sleep};
 use tracing::{debug, warn};
 
 /// Manages crawling scheduling and rate limiting
@@ -43,17 +43,26 @@ impl CrawlScheduler {
             let elapsed = last_request_time.elapsed();
             if elapsed < self.request_delay {
                 let remaining_delay = self.request_delay - elapsed;
-                debug!("Delaying {}ms for domain: {}", remaining_delay.as_millis(), domain);
+                debug!(
+                    "Delaying {}ms for domain: {}",
+                    remaining_delay.as_millis(),
+                    domain
+                );
                 sleep(remaining_delay).await;
             }
         }
 
         // Update last request time for this domain
-        self.domain_delays.insert(domain.to_string(), Instant::now());
+        self.domain_delays
+            .insert(domain.to_string(), Instant::now());
     }
 
     /// Execute a crawling task with proper scheduling
-    pub async fn schedule_crawl<F, Fut, T>(&self, domain: &str, task: F) -> Result<T, SchedulerError>
+    pub async fn schedule_crawl<F, Fut, T>(
+        &self,
+        domain: &str,
+        task: F,
+    ) -> Result<T, SchedulerError>
     where
         F: Fn() -> Fut, // Changed: FnOnce -> Fn (allows multiple calls)
         Fut: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>>,
@@ -108,5 +117,5 @@ pub struct SchedulerStats {
 #[derive(Debug, thiserror::Error)]
 pub enum SchedulerError {
     #[error("Maximum retries exceeded: {0}")]
-    MaxRetriesExceeded(String)
+    MaxRetriesExceeded(String),
 }

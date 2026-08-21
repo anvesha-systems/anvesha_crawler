@@ -1,13 +1,18 @@
+use crate::models::PageData;
+use crate::storage::{Result, SearchResult, StorageError, StoredPage};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use tantivy::{collector::TopDocs, query::QueryParser, schema::{Field, Schema, TextOptions, TextFieldIndexing, IndexRecordOption}, Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument, Term};
 use tantivy::schema::{NumericOptions, Value};
 use tantivy::tokenizer::{
-    TextAnalyzer, SimpleTokenizer, LowerCaser, RemoveLongFilter, Stemmer, Language
+    Language, LowerCaser, RemoveLongFilter, SimpleTokenizer, Stemmer, TextAnalyzer,
+};
+use tantivy::{
+    Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument, Term,
+    collector::TopDocs,
+    query::QueryParser,
+    schema::{Field, IndexRecordOption, Schema, TextFieldIndexing, TextOptions},
 };
 use tracing::{debug, info};
-use crate::storage::{StoredPage, SearchResult, Result, StorageError};
-use crate::models::PageData;
 
 pub struct SearchIndex {
     index: Index,
@@ -27,42 +32,43 @@ pub struct SearchIndex {
     content_en_field: Field,
 
     // Indian language fields
-    title_hi_field: Field,    // [translate:हिंदी] (Hindi)
+    title_hi_field: Field, // [translate:हिंदी] (Hindi)
     content_hi_field: Field,
-    title_kn_field: Field,    // [translate:ಕನ್ನಡ] (Kannada)
+    title_kn_field: Field, // [translate:ಕನ್ನಡ] (Kannada)
     content_kn_field: Field,
-    title_ta_field: Field,    // [translate:தமிழ்] (Tamil)
+    title_ta_field: Field, // [translate:தமிழ்] (Tamil)
     content_ta_field: Field,
-    title_te_field: Field,    // [translate:తెలుగు] (Telugu)
+    title_te_field: Field, // [translate:తెలుగు] (Telugu)
     content_te_field: Field,
-    title_ml_field: Field,    // [translate:മലയാളം] (Malayalam)
+    title_ml_field: Field, // [translate:മലയാളം] (Malayalam)
     content_ml_field: Field,
-    title_mr_field: Field,    // [translate:मराठी] (Marathi)
+    title_mr_field: Field, // [translate:मराठी] (Marathi)
     content_mr_field: Field,
 }
 
 impl SearchIndex {
     pub fn new(index_path: &Path) -> Result<Self> {
-        info!("Creating 6-language Indian search index at: {:?}", index_path);
+        info!(
+            "Creating 6-language Indian search index at: {:?}",
+            index_path
+        );
 
         let mut schema_builder = tantivy::schema::SchemaBuilder::new();
 
         // Base configuration for all languages
-        let base_searchable = |tokenizer: &str| TextOptions::default()
-            .set_stored()
-            .set_indexing_options(
+        let base_searchable = |tokenizer: &str| {
+            TextOptions::default().set_stored().set_indexing_options(
                 TextFieldIndexing::default()
                     .set_tokenizer(tokenizer)
                     .set_index_option(IndexRecordOption::WithFreqsAndPositions),
-            );
+            )
+        };
 
-        let text_raw_stored = TextOptions::default()
-            .set_stored()
-            .set_indexing_options(
-                TextFieldIndexing::default()
-                    .set_tokenizer("raw")
-                    .set_index_option(IndexRecordOption::WithFreqs),
-            );
+        let text_raw_stored = TextOptions::default().set_stored().set_indexing_options(
+            TextFieldIndexing::default()
+                .set_tokenizer("raw")
+                .set_index_option(IndexRecordOption::WithFreqs),
+        );
 
         // Numeric fields
         let num_stored = NumericOptions::default().set_stored();
@@ -77,27 +83,36 @@ impl SearchIndex {
 
         // English fields
         let title_en_field = schema_builder.add_text_field("title_en", base_searchable("english"));
-        let description_en_field = schema_builder.add_text_field("description_en", base_searchable("english"));
-        let content_en_field = schema_builder.add_text_field("content_en", base_searchable("english"));
+        let description_en_field =
+            schema_builder.add_text_field("description_en", base_searchable("english"));
+        let content_en_field =
+            schema_builder.add_text_field("content_en", base_searchable("english"));
 
         // Indian language fields
         let title_hi_field = schema_builder.add_text_field("title_hi", base_searchable("hindi"));
-        let content_hi_field = schema_builder.add_text_field("content_hi", base_searchable("hindi"));
+        let content_hi_field =
+            schema_builder.add_text_field("content_hi", base_searchable("hindi"));
 
         let title_kn_field = schema_builder.add_text_field("title_kn", base_searchable("kannada"));
-        let content_kn_field = schema_builder.add_text_field("content_kn", base_searchable("kannada"));
+        let content_kn_field =
+            schema_builder.add_text_field("content_kn", base_searchable("kannada"));
 
         let title_ta_field = schema_builder.add_text_field("title_ta", base_searchable("tamil"));
-        let content_ta_field = schema_builder.add_text_field("content_ta", base_searchable("tamil"));
+        let content_ta_field =
+            schema_builder.add_text_field("content_ta", base_searchable("tamil"));
 
         let title_te_field = schema_builder.add_text_field("title_te", base_searchable("telugu"));
-        let content_te_field = schema_builder.add_text_field("content_te", base_searchable("telugu"));
+        let content_te_field =
+            schema_builder.add_text_field("content_te", base_searchable("telugu"));
 
-        let title_ml_field = schema_builder.add_text_field("title_ml", base_searchable("malayalam"));
-        let content_ml_field = schema_builder.add_text_field("content_ml", base_searchable("malayalam"));
+        let title_ml_field =
+            schema_builder.add_text_field("title_ml", base_searchable("malayalam"));
+        let content_ml_field =
+            schema_builder.add_text_field("content_ml", base_searchable("malayalam"));
 
         let title_mr_field = schema_builder.add_text_field("title_mr", base_searchable("marathi"));
-        let content_mr_field = schema_builder.add_text_field("content_mr", base_searchable("marathi"));
+        let content_mr_field =
+            schema_builder.add_text_field("content_mr", base_searchable("marathi"));
 
         let schema = schema_builder.build();
 
@@ -106,7 +121,9 @@ impl SearchIndex {
 
         let index = Index::open_in_dir(index_path)
             .or_else(|_| Index::create_in_dir(index_path, schema.clone()))
-            .map_err(|e| StorageError::SearchIndex(format!("Failed to create/open index: {}", e)))?;
+            .map_err(|e| {
+                StorageError::SearchIndex(format!("Failed to create/open index: {}", e))
+            })?;
 
         // Register all 6 Indian language tokenizers
         Self::register_indian_tokenizers(&index);
@@ -192,7 +209,9 @@ impl SearchIndex {
             .filter(RemoveLongFilter::limit(120))
             .filter(LowerCaser)
             .build();
-        index.tokenizers().register("malayalam", malayalam_tokenizer);
+        index
+            .tokenizers()
+            .register("malayalam", malayalam_tokenizer);
 
         // Marathi tokenizer (Uses Devanagari like Hindi: U+0900-U+097F) [web:45]
         let marathi_tokenizer = TextAnalyzer::builder(SimpleTokenizer::default())
@@ -217,7 +236,7 @@ impl SearchIndex {
                         // Further distinguish Hindi vs Marathi by common patterns
                         counts[1] += 1; // Default to Hindi
                         counts[6] += 1; // Also count for Marathi
-                    },
+                    }
                     // Kannada (U+0C80-U+0CFF) [web:31][web:33]
                     0x0C80..=0x0CFF => counts[2] += 1,
                     // Tamil (U+0B80-U+0BFF)
@@ -229,11 +248,12 @@ impl SearchIndex {
                     _ => {}
                 }
                 counts
-            }
+            },
         );
 
         // Find the script with the highest character count - FIXED: Use owned values
-        let max_idx = char_counts.iter()
+        let max_idx = char_counts
+            .iter()
             .enumerate()
             .max_by_key(|(_, count)| *count) // Changed from &count to *count
             .map(|(idx, _)| idx)
@@ -245,7 +265,8 @@ impl SearchIndex {
                 // Distinguish Hindi vs Marathi
                 if char_counts[6] > char_counts[1] / 2 {
                     // If Marathi count is significant, do additional checks
-                    if content.contains("मराठी") || content.contains("महाराष्ट्र") {
+                    if content.contains("मराठी") || content.contains("महाराष्ट्र")
+                    {
                         "mr".to_string() // Marathi
                     } else {
                         "hi".to_string() // Default to Hindi
@@ -253,7 +274,7 @@ impl SearchIndex {
                 } else {
                     "hi".to_string()
                 }
-            },
+            }
             2 => "kn".to_string(), // Kannada
             3 => "ta".to_string(), // Tamil
             4 => "te".to_string(), // Telugu
@@ -269,7 +290,12 @@ impl SearchIndex {
         self.index_page_with_language(page_id, page, &detected_language)
     }
 
-    pub fn index_page_with_language(&self, page_id: i64, page: &PageData, detected_language: &str) -> Result<()> {
+    pub fn index_page_with_language(
+        &self,
+        page_id: i64,
+        page: &PageData,
+        detected_language: &str,
+    ) -> Result<()> {
         let mut doc = TantivyDocument::new(); // FIXED: Use Document::new() instead of default()
 
         // Common fields
@@ -289,7 +315,7 @@ impl SearchIndex {
                 }
                 doc.add_text(self.content_hi_field, &page.content);
                 info!("Indexed Hindi content: {}", page.url);
-            },
+            }
             "kn" => {
                 // [translate:ಕನ್ನಡ] Kannada
                 if let Some(title) = &page.title {
@@ -297,7 +323,7 @@ impl SearchIndex {
                 }
                 doc.add_text(self.content_kn_field, &page.content);
                 info!("Indexed Kannada content: {}", page.url);
-            },
+            }
             "ta" => {
                 // [translate:தமிழ்] Tamil
                 if let Some(title) = &page.title {
@@ -305,7 +331,7 @@ impl SearchIndex {
                 }
                 doc.add_text(self.content_ta_field, &page.content);
                 info!("Indexed Tamil content: {}", page.url);
-            },
+            }
             "te" => {
                 // [translate:తెలుగు] Telugu
                 if let Some(title) = &page.title {
@@ -313,7 +339,7 @@ impl SearchIndex {
                 }
                 doc.add_text(self.content_te_field, &page.content);
                 info!("📝 Indexed Telugu content: {}", page.url);
-            },
+            }
             "ml" => {
                 // [translate:മലയാളം] Malayalam
                 if let Some(title) = &page.title {
@@ -321,7 +347,7 @@ impl SearchIndex {
                 }
                 doc.add_text(self.content_ml_field, &page.content);
                 info!("📝 Indexed Malayalam content: {}", page.url);
-            },
+            }
             "mr" => {
                 // [translate:मराठी] Marathi
                 if let Some(title) = &page.title {
@@ -329,7 +355,7 @@ impl SearchIndex {
                 }
                 doc.add_text(self.content_mr_field, &page.content);
                 info!("Indexed Marathi content: {}", page.url);
-            },
+            }
             _ => {
                 // English (default)
                 if let Some(title) = &page.title {
@@ -350,18 +376,32 @@ impl SearchIndex {
                 .map_err(|e| StorageError::SearchIndex(format!("Failed to add document: {}", e)))?;
         }
 
-        debug!("Indexed {} page: {} (ID: {})", detected_language, page.url, page_id);
+        debug!(
+            "Indexed {} page: {} (ID: {})",
+            detected_language, page.url, page_id
+        );
         Ok(())
     }
 
     //  Smart multi-language search
-    pub fn search(&self, query_str: &str, limit: usize, offset: usize) -> Result<Vec<SearchResult>> {
+    pub fn search(
+        &self,
+        query_str: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<SearchResult>> {
         // Auto-detect query language and search appropriately
         let query_language = self.detect_content_language(query_str);
         self.search_with_language(query_str, Some(&query_language), limit, offset)
     }
 
-    pub fn search_with_language(&self, query_str: &str, language: Option<&str>, limit: usize, offset: usize) -> Result<Vec<SearchResult>> {
+    pub fn search_with_language(
+        &self,
+        query_str: &str,
+        language: Option<&str>,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<SearchResult>> {
         let searcher = self.reader.searcher();
 
         // 🔥 Select search fields based on language
@@ -372,20 +412,35 @@ impl SearchIndex {
             Some("te") => vec![self.title_te_field, self.content_te_field],
             Some("ml") => vec![self.title_ml_field, self.content_ml_field],
             Some("mr") => vec![self.title_mr_field, self.content_mr_field],
-            Some("en") => vec![self.title_en_field, self.description_en_field, self.content_en_field],
+            Some("en") => vec![
+                self.title_en_field,
+                self.description_en_field,
+                self.content_en_field,
+            ],
             None => {
                 // Search across ALL languages
                 vec![
-                    self.title_en_field, self.content_en_field,
-                    self.title_hi_field, self.content_hi_field,
-                    self.title_kn_field, self.content_kn_field,
-                    self.title_ta_field, self.content_ta_field,
-                    self.title_te_field, self.content_te_field,
-                    self.title_ml_field, self.content_ml_field,
-                    self.title_mr_field, self.content_mr_field,
+                    self.title_en_field,
+                    self.content_en_field,
+                    self.title_hi_field,
+                    self.content_hi_field,
+                    self.title_kn_field,
+                    self.content_kn_field,
+                    self.title_ta_field,
+                    self.content_ta_field,
+                    self.title_te_field,
+                    self.content_te_field,
+                    self.title_ml_field,
+                    self.content_ml_field,
+                    self.title_mr_field,
+                    self.content_mr_field,
                 ]
-            },
-            _ => vec![self.title_en_field, self.description_en_field, self.content_en_field], // fallback
+            }
+            _ => vec![
+                self.title_en_field,
+                self.description_en_field,
+                self.content_en_field,
+            ], // fallback
         };
 
         let query_parser = QueryParser::for_index(&self.index, search_fields);
@@ -407,13 +462,13 @@ impl SearchIndex {
 
         let mut results = Vec::new();
         for (score, doc_address) in top_docs.into_iter().skip(offset) {
-            let retrieved_doc : TantivyDocument = searcher
+            let retrieved_doc: TantivyDocument = searcher
                 .doc(doc_address)
                 .map_err(|e| StorageError::SearchIndex(format!("Failed to fetch doc: {}", e)))?;
 
             let id: i64 = retrieved_doc
-                .get_first(self.id_field)     // Option<CompactDocValue>
-                .and_then(|v| v.as_i64())    // Option<i64>
+                .get_first(self.id_field) // Option<CompactDocValue>
+                .and_then(|v| v.as_i64()) // Option<i64>
                 .unwrap_or(0);
 
             let url = retrieved_doc
@@ -429,18 +484,43 @@ impl SearchIndex {
 
             // Get title from appropriate language field
             let title = match detected_lang {
-                "hi" => retrieved_doc.get_first(self.title_hi_field).and_then(|v| v.as_str()),
-                "kn" => retrieved_doc.get_first(self.title_kn_field).and_then(|v| v.as_str()),
-                "ta" => retrieved_doc.get_first(self.title_ta_field).and_then(|v| v.as_str()),
-                "te" => retrieved_doc.get_first(self.title_te_field).and_then(|v| v.as_str()),
-                "ml" => retrieved_doc.get_first(self.title_ml_field).and_then(|v| v.as_str()),
-                "mr" => retrieved_doc.get_first(self.title_mr_field).and_then(|v| v.as_str()),
-                _ => retrieved_doc.get_first(self.title_en_field).and_then(|v| v.as_str()),
-            }.map(|s| s.to_string());
+                "hi" => retrieved_doc
+                    .get_first(self.title_hi_field)
+                    .and_then(|v| v.as_str()),
+                "kn" => retrieved_doc
+                    .get_first(self.title_kn_field)
+                    .and_then(|v| v.as_str()),
+                "ta" => retrieved_doc
+                    .get_first(self.title_ta_field)
+                    .and_then(|v| v.as_str()),
+                "te" => retrieved_doc
+                    .get_first(self.title_te_field)
+                    .and_then(|v| v.as_str()),
+                "ml" => retrieved_doc
+                    .get_first(self.title_ml_field)
+                    .and_then(|v| v.as_str()),
+                "mr" => retrieved_doc
+                    .get_first(self.title_mr_field)
+                    .and_then(|v| v.as_str()),
+                _ => retrieved_doc
+                    .get_first(self.title_en_field)
+                    .and_then(|v| v.as_str()),
+            }
+            .map(|s| s.to_string());
 
-            let description = retrieved_doc.get_first(self.description_en_field).and_then(|v| v.as_str()).map(|s| s.to_string());
-            let domain = retrieved_doc.get_first(self.domain_field).and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let quality_score = retrieved_doc.get_first(self.quality_field).and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let description = retrieved_doc
+                .get_first(self.description_en_field)
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let domain = retrieved_doc
+                .get_first(self.domain_field)
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let quality_score = retrieved_doc
+                .get_first(self.quality_field)
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
 
             let snippet = description.clone().unwrap_or_else(|| {
                 if url.len() > 100 {
@@ -476,7 +556,12 @@ impl SearchIndex {
         }
 
         let lang_display = language.unwrap_or("all languages");
-        debug!("🔍 Search for '{}' in {} returned {} results", query_str, lang_display, results.len());
+        debug!(
+            "🔍 Search for '{}' in {} returned {} results",
+            query_str,
+            lang_display,
+            results.len()
+        );
         Ok(results)
     }
 
@@ -496,37 +581,37 @@ impl SearchIndex {
                     doc.add_text(self.title_hi_field, title);
                 }
                 doc.add_text(self.content_hi_field, &page.content);
-            },
+            }
             "kn" => {
                 if let Some(title) = &page.title {
                     doc.add_text(self.title_kn_field, title);
                 }
                 doc.add_text(self.content_kn_field, &page.content);
-            },
+            }
             "ta" => {
                 if let Some(title) = &page.title {
                     doc.add_text(self.title_ta_field, title);
                 }
                 doc.add_text(self.content_ta_field, &page.content);
-            },
+            }
             "te" => {
                 if let Some(title) = &page.title {
                     doc.add_text(self.title_te_field, title);
                 }
                 doc.add_text(self.content_te_field, &page.content);
-            },
+            }
             "ml" => {
                 if let Some(title) = &page.title {
                     doc.add_text(self.title_ml_field, title);
                 }
                 doc.add_text(self.content_ml_field, &page.content);
-            },
+            }
             "mr" => {
                 if let Some(title) = &page.title {
                     doc.add_text(self.title_mr_field, title);
                 }
                 doc.add_text(self.content_mr_field, &page.content);
-            },
+            }
             _ => {
                 // English
                 if let Some(title) = &page.title {
@@ -545,7 +630,10 @@ impl SearchIndex {
                 .add_document(doc)
                 .map_err(|e| StorageError::SearchIndex(format!("Failed to add document: {}", e)))?;
         }
-        debug!("Indexed stored {} page: {} (ID: {})", page.language, page.url, page.id);
+        debug!(
+            "Indexed stored {} page: {} (ID: {})",
+            page.language, page.url, page.id
+        );
         Ok(())
     }
 
@@ -569,37 +657,37 @@ impl SearchIndex {
                         doc.add_text(self.title_hi_field, title);
                     }
                     doc.add_text(self.content_hi_field, &page.content);
-                },
+                }
                 "kn" => {
                     if let Some(title) = &page.title {
                         doc.add_text(self.title_kn_field, title);
                     }
                     doc.add_text(self.content_kn_field, &page.content);
-                },
+                }
                 "ta" => {
                     if let Some(title) = &page.title {
                         doc.add_text(self.title_ta_field, title);
                     }
                     doc.add_text(self.content_ta_field, &page.content);
-                },
+                }
                 "te" => {
                     if let Some(title) = &page.title {
                         doc.add_text(self.title_te_field, title);
                     }
                     doc.add_text(self.content_te_field, &page.content);
-                },
+                }
                 "ml" => {
                     if let Some(title) = &page.title {
                         doc.add_text(self.title_ml_field, title);
                     }
                     doc.add_text(self.content_ml_field, &page.content);
-                },
+                }
                 "mr" => {
                     if let Some(title) = &page.title {
                         doc.add_text(self.title_mr_field, title);
                     }
                     doc.add_text(self.content_mr_field, &page.content);
-                },
+                }
                 _ => {
                     if let Some(title) = &page.title {
                         doc.add_text(self.title_en_field, title);
@@ -615,7 +703,10 @@ impl SearchIndex {
                 .add_document(doc)
                 .map_err(|e| StorageError::SearchIndex(format!("Failed to add document: {}", e)))?;
         }
-        info!("Batch indexed {} pages across multiple Indian languages", pages.len());
+        info!(
+            "Batch indexed {} pages across multiple Indian languages",
+            pages.len()
+        );
         Ok(())
     }
 
@@ -644,15 +735,15 @@ impl SearchIndex {
 
         Ok(SearchStats {
             total_documents: num_docs,
-            index_size_bytes: index_size
+            index_size_bytes: index_size,
         })
     }
 
     pub fn optimize(&self) -> Result<()> {
         let mut writer = self.writer.lock().unwrap();
-        writer
-            .commit()
-            .map_err(|e| StorageError::SearchIndex(format!("Failed to commit during optimize: {}", e)))?;
+        writer.commit().map_err(|e| {
+            StorageError::SearchIndex(format!("Failed to commit during optimize: {}", e))
+        })?;
         Ok(())
     }
 

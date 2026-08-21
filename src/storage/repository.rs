@@ -78,7 +78,8 @@ impl PageRepository {
 
         let page_id: i64 = row.get("id");
 
-        self.update_domain_stats(&stored_page.domain, stored_page.quality_score).await?;
+        self.update_domain_stats(&stored_page.domain, stored_page.quality_score)
+            .await?;
 
         info!("Saved page: {} (ID: {})", page.url, page_id);
         Ok(page_id)
@@ -163,7 +164,7 @@ impl PageRepository {
         let mut qb = QueryBuilder::<Postgres>::new(
             "SELECT id, url, url_hash, domain, title, description, content, content_hash, \
              quality_score, word_count, language, crawl_depth, crawled_at, last_modified, \
-             status_code, content_type, content_length, pagerank, tfidf_score FROM pages WHERE 1=1"
+             status_code, content_type, content_length, pagerank, tfidf_score FROM pages WHERE 1=1",
         );
 
         if let Some(domain) = &filter.domain {
@@ -182,7 +183,8 @@ impl PageRepository {
             qb.push(" AND crawled_at >= ").push_bind(after.to_rfc3339());
         }
         if let Some(before) = &filter.crawled_before {
-            qb.push(" AND crawled_at <= ").push_bind(before.to_rfc3339());
+            qb.push(" AND crawled_at <= ")
+                .push_bind(before.to_rfc3339());
         }
 
         qb.push(" ORDER BY quality_score DESC, crawled_at DESC");
@@ -206,9 +208,7 @@ impl PageRepository {
         INNER JOIN pages p2 ON l.target_url = p2.url
     "#;
 
-        let rows = sqlx::query(sql)
-            .fetch_all(&self.pool)
-            .await?;
+        let rows = sqlx::query(sql).fetch_all(&self.pool).await?;
 
         let mut links = Vec::new();
 
@@ -223,7 +223,7 @@ impl PageRepository {
     }
 
     // update page rank values for a page
-    pub async fn update_pagerank(&self, url: &str, pagerank:f64) -> Result<()>{
+    pub async fn update_pagerank(&self, url: &str, pagerank: f64) -> Result<()> {
         let url_hash = Self::calculate_url_hash(url);
 
         let query = r#"
@@ -254,8 +254,8 @@ impl PageRepository {
         for (url, rank) in ranks {
             let url_hash = Self::calculate_url_hash(url);
             sqlx::query(query)
-            .bind(rank)
-            .bind(url_hash)
+                .bind(rank)
+                .bind(url_hash)
                 .execute(&mut *tx)
                 .await?;
         }
@@ -267,7 +267,7 @@ impl PageRepository {
     }
 
     // get pages with highest PageRank
-    pub async fn get_top_pages_by_pagerank(&self, limit: usize) -> Result<Vec<StoredPage>>{
+    pub async fn get_top_pages_by_pagerank(&self, limit: usize) -> Result<Vec<StoredPage>> {
         let query = r#"
             SELECT id, url, url_hash, domain, title, description, content, content_hash,
             quality_score, word_count, language, crawl_depth, crawled_at, last_modified,
@@ -280,7 +280,7 @@ impl PageRepository {
         "#;
 
         let pages = sqlx::query_as::<_, StoredPage>(query)
-        .bind(limit as i64)
+            .bind(limit as i64)
             .fetch_all(&self.pool)
             .await?;
 
@@ -288,7 +288,9 @@ impl PageRepository {
     }
 
     pub async fn get_pages_by_domain(&self, domain: &str, limit: usize) -> Result<Vec<StoredPage>> {
-        let filter = PageFilter::new().with_domain(domain.to_string()).with_limit(limit);
+        let filter = PageFilter::new()
+            .with_domain(domain.to_string())
+            .with_limit(limit);
         self.get_pages(&filter).await
     }
 
@@ -365,7 +367,6 @@ impl PageRepository {
         Ok(ids)
     }
 
-
     pub async fn update_tfidf_score(&self, url_hash: &str, tfidf: f64) -> Result<()> {
         sqlx::query("UPDATE pages SET tfidf_score = $1 WHERE url_hash = $2")
             .bind(tfidf)
@@ -424,7 +425,12 @@ impl PageRepository {
         Ok(row.get("id"))
     }
 
-    pub async fn update_crawl_session(&self, session_id: i64, crawled: i32, failed: i32) -> Result<()> {
+    pub async fn update_crawl_session(
+        &self,
+        session_id: i64,
+        crawled: i32,
+        failed: i32,
+    ) -> Result<()> {
         //  CHANGE: Use $1, $2, $3
         let query = r#"
             UPDATE crawl_sessions
@@ -458,16 +464,18 @@ impl PageRepository {
     }
 
     pub async fn get_stats(&self) -> Result<DatabaseStats> {
-        let row = sqlx::query(r#"
+        let row = sqlx::query(
+            r#"
             SELECT
                 (SELECT COUNT(*) FROM pages) as total_pages,
                 (SELECT COUNT(*) FROM links) as total_links,
                 (SELECT COUNT(*) FROM domains) as total_domains,
                 (SELECT AVG(quality_score) FROM pages WHERE quality_score > 0) as avg_quality_score,
                 (SELECT COUNT(*) FROM crawl_sessions) as crawl_sessions
-        "#)
-            .fetch_one(&self.pool)
-            .await?;
+        "#,
+        )
+        .fetch_one(&self.pool)
+        .await?;
 
         Ok(DatabaseStats {
             total_pages: row.get("total_pages"),

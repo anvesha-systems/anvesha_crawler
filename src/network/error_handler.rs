@@ -59,14 +59,14 @@ impl NetworkError {
             NetworkError::DnsError(_) => false, // DNS errors rarely resolve quickly
             NetworkError::Http { status, .. } => {
                 // Retry on server errors, not client errors
-                *status >= 500 && *status < 600 || *status == 429  // Fixed: now status is u16, this works
-            },
+                *status >= 500 && *status < 600 || *status == 429 // Fixed: now status is u16, this works
+            }
             NetworkError::RateLimited(_) => true,
             NetworkError::TlsError(_) => false,
             NetworkError::Request(e) => {
                 // Check reqwest error type
                 e.is_timeout() || e.is_connect()
-            },
+            }
             _ => false,
         }
     }
@@ -77,12 +77,13 @@ impl NetworkError {
             NetworkError::Timeout(_) => 2000,
             NetworkError::Connection(_) => 1000,
             NetworkError::Http { status, .. } => {
-                match *status { // Fixed: now status is u16, this works
-                    429 => 5000,  // Rate limited - wait longer
-                    502 | 503 | 504 => 3000,  // Server issues
+                match *status {
+                    // Fixed: now status is u16, this works
+                    429 => 5000,             // Rate limited - wait longer
+                    502 | 503 | 504 => 3000, // Server issues
                     _ => 1000,
                 }
-            },
+            }
             NetworkError::RateLimited(_) => 5000,
             _ => 1000, // Fixed: changed default from 5000 to 1000 for consistency
         }

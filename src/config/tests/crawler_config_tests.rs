@@ -22,7 +22,10 @@ fn test_config_for_testing() {
 
     assert!(config.crawler.max_pages <= 10); // Small for testing
     assert!(!config.crawler.seed_urls.is_empty());
-    assert!(config.storage.database_url.contains("memory") || config.storage.database_url.contains("test"));
+    assert!(
+        config.storage.database_url.contains("memory")
+            || config.storage.database_url.contains("test")
+    );
 }
 
 #[test]

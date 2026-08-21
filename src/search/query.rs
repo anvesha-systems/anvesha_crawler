@@ -1,13 +1,13 @@
-use tantivy::{Index, IndexReader, ReloadPolicy, Document};
+use serde::{Deserialize, Serialize};
+use std::path::Path;
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
-use std::path::Path;
-use serde::{Serialize, Deserialize};
 use tantivy::schema::Value;
+use tantivy::{Document, Index, IndexReader, ReloadPolicy};
 use tracing::info;
 
-use super::schema::SearchSchema;
 use super::filters::{SearchFilter, SortBy};
+use super::schema::SearchSchema;
 use super::snippets::SnippetGenerator;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -54,7 +54,7 @@ impl SearchQuery {
             SortBy::Relevance,
             0,
             false,
-            false
+            false,
         )
     }
 
@@ -136,15 +136,10 @@ impl SearchQuery {
 
                 match content_opt {
                     Some(content) => {
-                        eprintln!("Content retrieved, length: {}", content.len());
                         let snippet_text = snippet_gen.generate(content, &query_terms, highlight);
-                        eprintln!("Snippet generated, length: {}", snippet_text.len());
                         Some(snippet_text)
                     }
-                    None => {
-                        eprintln!("Content field is EMPTY or not stored in index!");
-                        None
-                    }
+                    None => None,
                 }
             } else {
                 None
@@ -183,15 +178,17 @@ impl SearchQuery {
 
             let penalty = SearchQuery::utility_penalty(&url);
 
-            let combined_score = ((tantivy_score as f64 * 0.6) + (pagerank_scaled * 0.25) + (tfidf_sealed * 0.15)) * penalty;
+            let combined_score =
+                ((tantivy_score as f64 * 0.6) + (pagerank_scaled * 0.25) + (tfidf_sealed * 0.15))
+                    * penalty;
 
             results.push(SearchResult {
                 url,
                 title,
                 domain,
                 quality_score,
-                score: combined_score as f32,  // Use combined score
-                pagerank,  // Store PageRank separately
+                score: combined_score as f32, // Use combined score
+                pagerank,                     // Store PageRank separately
                 tfidf,
                 crawled_at: None,
                 snippet,
@@ -216,7 +213,7 @@ impl SearchQuery {
                         .unwrap_or(std::cmp::Ordering::Equal)
                 });
             }
-            SortBy::PageRank => {  
+            SortBy::PageRank => {
                 results.sort_by(|a, b| {
                     b.pagerank
                         .partial_cmp(&a.pagerank)
@@ -225,7 +222,11 @@ impl SearchQuery {
             }
 
             SortBy::TfIdf => {
-                results.sort_by(|a,b| b.tfidf.partial_cmp(&a.tfidf).unwrap_or(std::cmp::Ordering::Equal));
+                results.sort_by(|a, b| {
+                    b.tfidf
+                        .partial_cmp(&a.tfidf)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
             }
 
             SortBy::Date => {
@@ -234,18 +235,17 @@ impl SearchQuery {
         }
 
         // Apply pagination AFTER sorting
-        let paginated: Vec<SearchResult> = results
-            .into_iter()
-            .skip(offset)
-            .take(limit)
-            .collect();
+        let paginated: Vec<SearchResult> = results.into_iter().skip(offset).take(limit).collect();
 
-        info!("🔍 Found {} results for query: '{}'", paginated.len(), query_str);
+        info!(result_count = paginated.len(), "search completed");
         Ok(paginated)
     }
 
     fn utility_penalty(url: &str) -> f64 {
-        if url.contains("action=edit") || url.contains("action=history") || url.contains("/Special:") {
+        if url.contains("action=edit")
+            || url.contains("action=history")
+            || url.contains("/Special:")
+        {
             0.85 // stronger penalty
         } else if url.contains("#") {
             0.95 // mild penalty for section anchors
@@ -254,7 +254,12 @@ impl SearchQuery {
         }
     }
 
-    pub fn search_by_domain(&self, query_str: &str, domain: &str, limit: usize) -> tantivy::Result<Vec<SearchResult>> {
+    pub fn search_by_domain(
+        &self,
+        query_str: &str,
+        domain: &str,
+        limit: usize,
+    ) -> tantivy::Result<Vec<SearchResult>> {
         let filters = SearchFilter::new().with_domain(domain.to_string());
         self.search_with_filters(
             query_str,
@@ -263,9 +268,7 @@ impl SearchQuery {
             SortBy::Relevance,
             0,
             false,
-            false
+            false,
         )
     }
 }
-
-

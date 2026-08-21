@@ -1,11 +1,11 @@
-pub mod schema;
+pub mod filters;
 pub mod indexer;
 pub mod query;
-pub mod filters;
+pub mod schema;
 mod snippets;
 
-pub use schema::SearchSchema;
+pub use filters::{SearchFilter, SortBy};
 pub use indexer::SearchIndexer;
 pub use query::{SearchQuery, SearchResult};
-pub use filters::{ SearchFilter, SortBy};
-pub use snippets::{ SnippetGenerator };
+pub use schema::SearchSchema;
+pub use snippets::SnippetGenerator;

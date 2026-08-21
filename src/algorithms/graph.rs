@@ -1,11 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use crate::storage::Result;
+use crate::storage::models::PageFilter;
 use clap::builder::Str;
 use log::info;
-use crate::storage::models::PageFilter;
-use crate::storage::Result;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
-pub struct LinkGraph{
+pub struct LinkGraph {
     // URL -> list of urls it links to
     pub outbounds: HashMap<String, Vec<String>>,
 
@@ -17,14 +17,14 @@ pub struct LinkGraph{
 }
 
 impl LinkGraph {
-    pub fn new() -> Self{
-        Self{
+    pub fn new() -> Self {
+        Self {
             outbounds: HashMap::new(),
             inbounds: HashMap::new(),
             nodes: Vec::new(),
         }
     }
-    pub async fn from_database(db: &crate::storage::repository::PageRepository)->Result<Self>{
+    pub async fn from_database(db: &crate::storage::repository::PageRepository) -> Result<Self> {
         use tracing::info;
 
         info!("Building link graph from database");
@@ -38,7 +38,7 @@ impl LinkGraph {
 
         let mut nodes = Vec::new();
         let mut outbounds: HashMap<String, Vec<String>> = HashMap::new();
-        let mut inbounds: HashMap<String,Vec<String>> = HashMap::new();
+        let mut inbounds: HashMap<String, Vec<String>> = HashMap::new();
 
         // collect all unique urls
         let all_urls: HashSet<String> = pages.iter().map(|p| p.url.clone()).collect();
@@ -47,33 +47,39 @@ impl LinkGraph {
         // get all links
         let links = db.get_all_links().await?;
 
-        for (source_url, target_url) in links{
+        for (source_url, target_url) in links {
             let source = source_url;
             let target = target_url;
 
-        //     add to outbound
-            outbounds.entry(source.clone())
+            //     add to outbound
+            outbounds
+                .entry(source.clone())
                 .or_insert_with(Vec::new)
                 .push(target.clone());
 
             // add to inbounds
 
-            inbounds.entry(target.clone())
+            inbounds
+                .entry(target.clone())
                 .or_insert_with(Vec::new)
                 .push(source.clone());
         }
 
         // ensure all nodes have entries (even if no links)
-        for url in &nodes{
+        for url in &nodes {
             outbounds.entry(url.clone()).or_insert_with(Vec::new);
             inbounds.entry(url.clone()).or_insert_with(Vec::new);
         }
-        
+
         let edge_count: usize = outbounds.values().map(|v| v.len()).sum();
 
-        info!("Link graph built: {} nodes, {} edges", nodes.len(), edge_count);
+        info!(
+            "Link graph built: {} nodes, {} edges",
+            nodes.len(),
+            edge_count
+        );
 
-        Ok(Self{
+        Ok(Self {
             outbounds,
             inbounds,
             nodes,
@@ -81,9 +87,11 @@ impl LinkGraph {
     }
 
     /// Build link graph from PageRepository
-    pub async fn from_repository(repo: &crate::storage::repository::PageRepository) -> crate::storage::Result<Self> {
-        use tracing::info;
+    pub async fn from_repository(
+        repo: &crate::storage::repository::PageRepository,
+    ) -> crate::storage::Result<Self> {
         use crate::algorithms::graph::PageFilter;
+        use tracing::info;
 
         info!("Building link graph from database...");
 
@@ -109,12 +117,14 @@ impl LinkGraph {
         // Build outbound and inbound maps
         for (source_url, target_url) in links {
             // Add to outbound
-            outbound.entry(source_url.clone())
+            outbound
+                .entry(source_url.clone())
                 .or_insert_with(Vec::new)
                 .push(target_url.clone());
 
             // Add to inbound
-            inbound.entry(target_url.clone())
+            inbound
+                .entry(target_url.clone())
                 .or_insert_with(Vec::new)
                 .push(source_url.clone());
         }
@@ -127,9 +137,11 @@ impl LinkGraph {
 
         let edge_count: usize = outbound.values().map(|v| v.len()).sum();
 
-        info!("Link graph built: {} nodes, {} edges",
-              nodes.len(),
-              edge_count);
+        info!(
+            "Link graph built: {} nodes, {} edges",
+            nodes.len(),
+            edge_count
+        );
 
         Ok(Self {
             outbounds: outbound,
@@ -138,20 +150,21 @@ impl LinkGraph {
         })
     }
 
-    pub fn node_count(&self)->usize{
+    pub fn node_count(&self) -> usize {
         self.nodes.len()
     }
 
-    pub fn outbound_count(&self, url: &str)->usize{
+    pub fn outbound_count(&self, url: &str) -> usize {
         self.outbounds.get(url).map(|v| v.len()).unwrap_or(0)
     }
 
-    pub fn inbound_count(&self, url: &str)->usize{
+    pub fn inbound_count(&self, url: &str) -> usize {
         self.inbounds.get(url).map(|v| v.len()).unwrap_or(0)
     }
 
-    pub fn dangling_nodes(&self) -> Vec<&String>{
-        self.nodes.iter()
+    pub fn dangling_nodes(&self) -> Vec<&String> {
+        self.nodes
+            .iter()
             .filter(|url| self.outbound_count(url) == 0)
             .collect()
     }

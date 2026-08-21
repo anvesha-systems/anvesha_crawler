@@ -25,8 +25,8 @@ impl PageProcessor {
                 "jpg", "jpeg", "png", "gif", "pdf", "doc", "docx", "zip", "tar", "gz", "mp3",
                 "mp4", "avi",
             ]
-                .iter()
-                .map(|s| s.to_string()),
+            .iter()
+            .map(|s| s.to_string()),
         );
 
         Self {
@@ -152,7 +152,8 @@ impl PageProcessor {
         let mut link_count = 0; // Fixed: line_count -> link_count
 
         for element in document.select(&link_selector) {
-            if link_count >= self.max_links_per_page { // Fixed: line_count -> link_count
+            if link_count >= self.max_links_per_page {
+                // Fixed: line_count -> link_count
                 break;
             }
 
@@ -181,7 +182,10 @@ impl PageProcessor {
         depth: u32, // Fixed: Changed parameter name from next_depth to depth for consistency
     ) -> Result<Option<CrawlUrl>, ProcessorError> {
         // Skip obvious non-web links
-        if href.starts_with("mailto:") || href.starts_with("tel:") || href.starts_with("javascript:") {
+        if href.starts_with("mailto:")
+            || href.starts_with("tel:")
+            || href.starts_with("javascript:")
+        {
             return Ok(None);
         }
 
@@ -193,7 +197,8 @@ impl PageProcessor {
         let url_str = absolute_url.to_string();
 
         // Check for ignored file extensions
-        if let Some(extension) = self.get_file_extension(&url_str) { // Fixed: extensions -> extension
+        if let Some(extension) = self.get_file_extension(&url_str) {
+            // Fixed: extensions -> extension
             if self.ignored_extensions.contains(&extension.to_lowercase()) {
                 return Ok(None);
             }
@@ -240,9 +245,7 @@ impl PageProcessor {
         // Content diversity (simple heuristic)
         let binding = content.to_lowercase();
 
-        let unique_words: HashSet<_> = binding
-            .split_whitespace()
-            .collect(); // Fixed: count() -> collect()
+        let unique_words: HashSet<_> = binding.split_whitespace().collect(); // Fixed: count() -> collect()
 
         let diversity_score = if word_count > 0 {
             (unique_words.len() as f64 / word_count as f64).min(1.0)
@@ -280,10 +283,14 @@ impl PageProcessor {
 
     /// Get file extension from URL
     fn get_file_extension(&self, url: &str) -> Option<String> {
-        url.split('?').next()? // Remove query parameters
-            .split('#').next()? // Remove fragment
-            .split('/').last()? // Get filename
-            .split('.').last()  // Get extension
+        url.split('?')
+            .next()? // Remove query parameters
+            .split('#')
+            .next()? // Remove fragment
+            .split('/')
+            .last()? // Get filename
+            .split('.')
+            .last() // Get extension
             .filter(|ext| !ext.is_empty()) // Make sure it's not empty
             .map(|ext| ext.to_string()) // Convert to owned String
     }

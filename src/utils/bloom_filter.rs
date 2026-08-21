@@ -6,16 +6,16 @@ pub struct BloomFilter {
 }
 
 impl BloomFilter {
-    pub fn new(_capacity : usize) -> Self {
-        Self{
+    pub fn new(_capacity: usize) -> Self {
+        Self {
             seen: HashSet::new(),
         }
     }
-    
+
     pub fn contains(&self, item: &str) -> bool {
         self.seen.contains(item)
     }
-    
+
     pub fn insert(&mut self, item: String) {
         self.seen.insert(item);
     }

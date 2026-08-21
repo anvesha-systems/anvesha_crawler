@@ -3,7 +3,7 @@ mod pagerank;
 mod tests;
 mod tfidf;
 
-pub use pagerank::PageRankCalculator;
 pub use graph::LinkGraph;
+pub use pagerank::PageRankCalculator;
 pub use tfidf::TfIdfCalculator;
-pub use tfidf::{TfIdfStats};
+pub use tfidf::TfIdfStats;

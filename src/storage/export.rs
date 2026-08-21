@@ -1,7 +1,7 @@
 // src/storage/export.rs
 use crate::storage::Result;
-use crate::storage::repository::PageRepository;
 use crate::storage::models::PageFilter;
+use crate::storage::repository::PageRepository;
 use csv::WriterBuilder;
 use serde::Serialize;
 use std::fs::File;
@@ -27,22 +27,14 @@ impl<'a> DataExporter<'a> {
         Self { repo }
     }
 
-    pub async fn pages_to_json<P: AsRef<Path>>(
-        &self,
-        filter: &PageFilter,
-        path: P,
-    ) -> Result<()> {
+    pub async fn pages_to_json<P: AsRef<Path>>(&self, filter: &PageFilter, path: P) -> Result<()> {
         let pages = self.repo.get_pages(filter).await?;
         let file = File::create(path)?;
         serde_json::to_writer_pretty(file, &pages)?;
         Ok(())
     }
 
-    pub async fn pages_to_csv<P: AsRef<Path>>(
-        &self,
-        filter: &PageFilter,
-        path: P,
-    ) -> Result<()> {
+    pub async fn pages_to_csv<P: AsRef<Path>>(&self, filter: &PageFilter, path: P) -> Result<()> {
         let pages = self.repo.get_pages(filter).await?;
         let file = File::create(path)?;
         let mut wtr = WriterBuilder::new().from_writer(file);
@@ -56,7 +48,8 @@ impl<'a> DataExporter<'a> {
                 word_count: p.word_count,
                 crawled_at: p.crawled_at.to_rfc3339(),
             };
-            wtr.serialize(row);
+            wtr.serialize(row)
+                .map_err(|e| crate::storage::StorageError::Export(e.to_string()))?;
         }
         wtr.flush()?;
         Ok(())
