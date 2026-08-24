@@ -24,7 +24,6 @@ mod integration_tests {
             Err(_) => return, // Skip if database not available
         };
 
-
         // Ensure schema is up to date before querying
         Database::migrate(&pool)
             .await
