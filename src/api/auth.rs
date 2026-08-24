@@ -15,7 +15,7 @@ use crate::api::{AppState, ErrorBody};
 ///
 /// If `api_key` is `None`, all requests pass through (local dev mode).
 /// If `api_key` is `Some(key)`, the request must carry:
-///   Authorization: Bearer <key>
+///   Authorization: Bearer \<key\>
 ///
 /// The key value is never logged.
 pub async fn require_auth(
